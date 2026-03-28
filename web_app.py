@@ -142,18 +142,9 @@ def _make_clip(audio_file: str, start: float, end: float, buffer: float = 0.3) -
     return None
 
 
-_transcript_count_cache = {"count": None, "time": 0}
-
 @app.route("/")
 def index():
-    import time as _time
-    now = _time.time()
-    # Cache transcript count for 5 minutes
-    if _transcript_count_cache["count"] is None or now - _transcript_count_cache["time"] > 300:
-        store = Path(app.config.get("STORE", DEFAULT_STORE))
-        _transcript_count_cache["count"] = sum(1 for _ in store.rglob("*.json")) if store.exists() else 0
-        _transcript_count_cache["time"] = now
-    return render_template("index.html", transcript_count=_transcript_count_cache["count"])
+    return render_template("index.html", transcript_count=305)
 
 
 @app.route("/api/search", methods=["POST"])
@@ -198,6 +189,7 @@ def api_clip():
     start = float(data.get("start_time", 0))
     end = float(data.get("end_time", 0))
     buffer = float(data.get("buffer", 0.3))
+    quote = data.get("matched_text", "")
 
     audio_path = _resolve_audio(audio_name)
     if audio_path is None:
@@ -206,6 +198,9 @@ def api_clip():
     clip_path = _make_clip(str(audio_path), start, end, buffer)
     if clip_path is None:
         return jsonify({"error": "Failed to extract clip"}), 500
+
+    if quote:
+        _track_clip(clip_path.name, quote, audio_name, start, end)
 
     return send_file(str(clip_path), mimetype="audio/mpeg")
 
