@@ -574,19 +574,19 @@
             const sel = window._selections[matchIdx];
             if (!sel || sel.start === -1) return;
 
-            if (wordIdx <= sel.start) {
-                // Clicked before/at start → move start
+            // Always move whichever boundary is closer
+            const distToStart = Math.abs(wordIdx - sel.start);
+            const distToEnd = Math.abs(wordIdx - sel.end);
+
+            if (distToStart <= distToEnd) {
                 sel.start = wordIdx;
-            } else if (wordIdx >= sel.end) {
-                // Clicked after/at end → move end
-                sel.end = wordIdx;
             } else {
-                // Clicked inside selection → move whichever boundary is closer
-                if ((wordIdx - sel.start) <= (sel.end - wordIdx)) {
-                    sel.start = wordIdx;
-                } else {
-                    sel.end = wordIdx;
-                }
+                sel.end = wordIdx;
+            }
+
+            // Ensure start <= end
+            if (sel.start > sel.end) {
+                [sel.start, sel.end] = [sel.end, sel.start];
             }
 
             updateSelectionUI(matchIdx);
