@@ -16,6 +16,7 @@ import tempfile
 from pathlib import Path
 
 from flask import Flask, render_template, request, jsonify, send_file
+from flask_cors import CORS
 
 # Reuse the core logic from find_quote.py
 from find_quote import (
@@ -27,6 +28,7 @@ from find_quote import (
 )
 
 app = Flask(__name__)
+CORS(app, origins=["https://drcaley.github.io"])
 
 CLIPS_DIR = Path(__file__).parent / "clips"
 CLIPS_DIR.mkdir(exist_ok=True)

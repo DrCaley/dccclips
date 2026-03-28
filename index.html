@@ -1,0 +1,728 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Apocalypse Will Be Clipped</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #0a0a12;
+            color: #e0e0e0;
+            min-height: 100vh;
+            background-image: radial-gradient(ellipse at top, #1a1028 0%, #0a0a12 60%);
+        }
+
+        .container {
+            max-width: 720px;
+            margin: 0 auto;
+            padding: 40px 20px;
+        }
+
+        h1 {
+            font-size: 1.8rem;
+            font-weight: 600;
+            margin-bottom: 4px;
+            color: #e8c547;
+            text-shadow: 0 0 20px rgba(232, 197, 71, 0.3);
+        }
+
+        .series-tag {
+            font-size: 0.8rem;
+            color: #b44;
+            font-weight: 500;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+            margin-bottom: 4px;
+        }
+
+        .subtitle {
+            color: #888;
+            margin-bottom: 24px;
+            font-size: 0.9rem;
+        }
+
+        /* Tabs */
+        .tabs {
+            display: flex;
+            gap: 0;
+            margin-bottom: 24px;
+            border-bottom: 1px solid #333;
+        }
+
+        .tab {
+            padding: 10px 24px;
+            font-size: 0.95rem;
+            font-weight: 500;
+            color: #888;
+            background: none;
+            border: none;
+            border-bottom: 2px solid transparent;
+            cursor: pointer;
+            transition: color 0.2s, border-color 0.2s;
+            border-radius: 0;
+        }
+
+        .tab:hover { color: #ccc; }
+        .tab.active { color: #e8c547; border-bottom-color: #e8c547; }
+
+        .tab-panel { display: none; }
+        .tab-panel.active { display: block; }
+
+        .tab-desc {
+            color: #666;
+            font-size: 0.85rem;
+            margin-bottom: 16px;
+        }
+
+        .search-box {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+
+        input[type="text"] {
+            flex: 1;
+            padding: 12px 16px;
+            font-size: 1rem;
+            border: 1px solid #2a2a3a;
+            border-radius: 8px;
+            background: #12121c;
+            color: #fff;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        input[type="text"]:focus {
+            border-color: #e8c547;
+        }
+
+        button {
+            padding: 12px 24px;
+            font-size: 1rem;
+            font-weight: 500;
+            border: none;
+            border-radius: 8px;
+            background: #b44;
+            color: #fff;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        button:hover { background: #c55; }
+        button:disabled { background: #333; cursor: not-allowed; }
+
+        .options {
+            display: flex;
+            gap: 16px;
+            align-items: center;
+            margin-bottom: 32px;
+            font-size: 0.85rem;
+            color: #888;
+            flex-wrap: wrap;
+        }
+
+        .options label { display: flex; align-items: center; gap: 4px; }
+
+        .options input[type="range"] {
+            width: 80px;
+            accent-color: #e8c547;
+        }
+
+        .options input[type="text"].filename-input {
+            flex: none;
+            width: 180px;
+            padding: 6px 10px;
+            font-size: 0.85rem;
+        }
+
+        .status {
+            text-align: center;
+            padding: 20px;
+            color: #666;
+        }
+
+        .spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 2px solid #333;
+            border-top-color: #e8c547;
+            border-radius: 50%;
+            animation: spin 0.6s linear infinite;
+            margin-right: 8px;
+            vertical-align: middle;
+        }
+
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        .results-header {
+            font-size: 0.9rem;
+            color: #888;
+            margin-bottom: 16px;
+        }
+
+        .match {
+            background: #12121c;
+            border: 1px solid #2a2a3a;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 12px;
+            transition: border-color 0.2s;
+        }
+
+        .match:hover { border-color: #e8c54744; }
+
+        .match-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+
+        .match-score {
+            font-weight: 600;
+            font-size: 1.1rem;
+        }
+
+        .score-high { color: #4ade80; }
+        .score-mid { color: #facc15; }
+        .score-low { color: #f87171; }
+
+        .match-time {
+            font-family: 'SF Mono', 'Fira Code', monospace;
+            font-size: 0.85rem;
+            color: #888;
+        }
+
+        .match-file {
+            font-size: 0.8rem;
+            color: #666;
+            margin-bottom: 8px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .match-text {
+            font-size: 1rem;
+            line-height: 1.5;
+            margin-bottom: 12px;
+            color: #ccc;
+        }
+
+        .match-context {
+            font-size: 0.85rem;
+            line-height: 1.5;
+            margin-bottom: 12px;
+            color: #777;
+        }
+
+        .match-context .highlight {
+            color: #fff;
+            font-weight: 500;
+        }
+
+        .match-text em {
+            font-style: normal;
+            color: #fff;
+        }
+
+        .match-actions {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .btn-small {
+            padding: 6px 14px;
+            font-size: 0.85rem;
+            border-radius: 6px;
+            background: #2a2a2a;
+            border: 1px solid #3a3a3a;
+        }
+
+        .btn-small:hover { background: #3a3a3a; }
+
+        .btn-clip-tab {
+            background: #2a1a1a;
+            border-color: #5a2a2a;
+            color: #e8c547;
+        }
+
+        .btn-clip-tab:hover { background: #3a2a2a; }
+
+        audio {
+            height: 32px;
+            flex: 1;
+            max-width: 300px;
+        }
+
+        .no-results {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+
+        .no-results p { margin-bottom: 8px; }
+
+        /* Clip result area */
+        .clip-result {
+            background: #12121c;
+            border: 1px solid #2a2a3a;
+            border-radius: 12px;
+            padding: 20px;
+            margin-top: 8px;
+        }
+
+        .clip-result .clip-info {
+            font-size: 0.85rem;
+            color: #888;
+            margin-bottom: 12px;
+        }
+
+        .clip-result .clip-info strong {
+            color: #ccc;
+        }
+
+        .clip-result audio {
+            width: 100%;
+            max-width: 100%;
+            margin-bottom: 12px;
+        }
+
+        .clip-result .download-link {
+            display: inline-block;
+            padding: 8px 16px;
+            font-size: 0.9rem;
+            background: #b44;
+            color: #fff;
+            text-decoration: none;
+            border-radius: 6px;
+        }
+
+        .clip-result .download-link:hover { background: #c55; }
+
+        /* Popular tab */
+        .popular-item {
+            background: #12121c;
+            border: 1px solid #2a2a3a;
+            border-radius: 12px;
+            padding: 16px 20px;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            transition: border-color 0.2s;
+        }
+
+        .popular-item:hover { border-color: #e8c54744; }
+
+        .popular-rank {
+            font-size: 1.4rem;
+            font-weight: 700;
+            color: #e8c547;
+            min-width: 32px;
+            text-align: center;
+        }
+
+        .popular-info {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .popular-quote {
+            font-size: 1rem;
+            color: #ccc;
+            margin-bottom: 4px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .popular-meta {
+            font-size: 0.8rem;
+            color: #666;
+        }
+
+        .popular-count {
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: #b44;
+            white-space: nowrap;
+        }
+
+        .popular-actions {
+            display: flex;
+            gap: 6px;
+            align-items: center;
+        }
+
+        .popular-empty {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>The Apocalypse Will Be Clipped</h1>
+        <p class="subtitle">Dungeon Crawler Carl Audiobook Clips</p>
+
+        <div class="tabs">
+            <button class="tab active" onclick="switchTab('find')">Find</button>
+            <button class="tab" onclick="switchTab('clip')">Clip</button>
+            <button class="tab" onclick="switchTab('popular')">Popular</button>
+        </div>
+
+        <!-- FIND TAB -->
+        <div id="tab-find" class="tab-panel active">
+            <p class="tab-desc">Search the audiobooks for a quote. See the matched text with surrounding context to confirm it's the right moment.</p>
+
+            <div class="search-box">
+                <input type="text" id="find-quote" placeholder="e.g. don't gaslight me Jesus..."
+                       autofocus autocomplete="off">
+                <button id="findBtn" onclick="doSearch()">Search</button>
+            </div>
+
+            <div class="options">
+                <label>
+                    Threshold:
+                    <input type="range" id="find-threshold" min="40" max="100" value="70">
+                    <span id="findThresholdVal">70%</span>
+                </label>
+            </div>
+
+            <div id="find-results"></div>
+        </div>
+
+        <!-- CLIP TAB -->
+        <div id="tab-clip" class="tab-panel">
+            <p class="tab-desc">Paste the exact text you want. It gets matched and the audio clip is extracted instantly.</p>
+
+            <div class="search-box">
+                <input type="text" id="clip-quote" placeholder="Paste the exact quote to extract..."
+                       autocomplete="off">
+                <button id="clipBtn" onclick="doClip()">Clip</button>
+            </div>
+
+            <div class="options">
+                <label>
+                    Filename:
+                    <input type="text" class="filename-input" id="clip-filename" placeholder="my_clip (optional)">
+                </label>
+                <label>
+                    Buffer:
+                    <input type="range" id="clip-buffer" min="0" max="20" value="3">
+                    <span id="clipBufferVal">0.3s</span>
+                </label>
+            </div>
+
+            <div id="clip-results"></div>
+        </div>
+
+        <!-- POPULAR TAB -->
+        <div id="tab-popular" class="tab-panel">
+            <p class="tab-desc">Most-requested clips, sorted by how many times they've been played.</p>
+            <div id="popular-results"></div>
+        </div>
+    </div>
+
+    <script>
+        const API = 'http://132.226.111.150:8080';
+
+        /* ── Tab switching ── */
+        function switchTab(tab) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+            document.getElementById('tab-' + tab).classList.add('active');
+            document.querySelector(`.tab[onclick="switchTab('${tab}')"]`).classList.add('active');
+            if (tab === 'clip') document.getElementById('clip-quote').focus();
+            else if (tab === 'find') document.getElementById('find-quote').focus();
+            else if (tab === 'popular') loadPopular();
+        }
+
+        /* ── Find tab ── */
+        const findThresholdSlider = document.getElementById('find-threshold');
+        const findThresholdVal = document.getElementById('findThresholdVal');
+        findThresholdSlider.addEventListener('input', () => {
+            findThresholdVal.textContent = findThresholdSlider.value + '%';
+        });
+
+        document.getElementById('find-quote').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') doSearch();
+        });
+
+        async function doSearch() {
+            const quote = document.getElementById('find-quote').value.trim();
+            if (!quote) return;
+
+            const btn = document.getElementById('findBtn');
+            const results = document.getElementById('find-results');
+            const threshold = parseInt(findThresholdSlider.value) / 100;
+
+            btn.disabled = true;
+            results.innerHTML = '<div class="status"><span class="spinner"></span>Searching...</div>';
+
+            try {
+                const resp = await fetch(API + '/api/search', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ quote, threshold }),
+                });
+                const data = await resp.json();
+
+                if (data.error) {
+                    results.innerHTML = `<div class="no-results"><p>${data.error}</p></div>`;
+                    return;
+                }
+
+                if (data.count === 0) {
+                    results.innerHTML = `
+                        <div class="no-results">
+                            <p>No matches found for "<strong>${esc(quote)}</strong>"</p>
+                            <p>Try lowering the threshold or different wording.</p>
+                        </div>`;
+                    return;
+                }
+
+                let html = `<div class="results-header">${data.count} match${data.count !== 1 ? 'es' : ''} for "${esc(quote)}"</div>`;
+
+                for (const m of data.results) {
+                    const scoreClass = m.score >= 90 ? 'score-high' : m.score >= 75 ? 'score-mid' : 'score-low';
+                    html += `
+                        <div class="match">
+                            <div class="match-header">
+                                <span class="match-score ${scoreClass}">${m.score}%</span>
+                                <span class="match-time">${m.start_fmt} → ${m.end_fmt}</span>
+                            </div>
+                            <div class="match-file" title="${esc(m.audio_name)}" style="display:none">${esc(m.audio_name)}</div>
+                            <div class="match-context">
+                                ...${esc(m.context_before)} <span class="highlight">${esc(m.matched_text)}</span> ${esc(m.context_after)}...
+                            </div>
+                            <div class="match-actions">
+                                <button class="btn-small" data-audio="${encodeURIComponent(m.audio_file)}" data-start="${m.start_time}" data-end="${m.end_time}" onclick="playClip(this)">
+                                    ▶ Play
+                                </button>
+                                <button class="btn-small btn-clip-tab" data-audio="${encodeURIComponent(m.audio_file)}" data-start="${m.start_time}" data-end="${m.end_time}" data-text="${encodeURIComponent(m.matched_text)}" onclick="downloadClip(this)">
+                                    ⬇ Clip this
+                                </button>
+                            </div>
+                        </div>`;
+                }
+
+                results.innerHTML = html;
+            } catch (err) {
+                results.innerHTML = `<div class="no-results"><p>Error: ${err.message}</p></div>`;
+            } finally {
+                btn.disabled = false;
+            }
+        }
+
+        async function playClip(btn) {
+            const audioFile = decodeURIComponent(btn.getAttribute('data-audio'));
+            const start = parseFloat(btn.getAttribute('data-start'));
+            const end = parseFloat(btn.getAttribute('data-end'));
+            btn.disabled = true;
+            btn.textContent = '⏳ Loading...';
+
+            try {
+                const resp = await fetch(API + '/api/clip', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ audio_file: audioFile, start_time: start, end_time: end }),
+                });
+
+                if (!resp.ok) throw new Error('Failed to extract clip');
+
+                const blob = await resp.blob();
+                const url = URL.createObjectURL(blob);
+
+                const audio = document.createElement('audio');
+                audio.controls = true;
+                audio.autoplay = true;
+                audio.src = url;
+
+                const actions = btn.parentElement;
+                const existing = actions.querySelector('audio');
+                if (existing) existing.remove();
+
+                actions.appendChild(audio);
+                btn.textContent = '▶ Play';
+            } catch (err) {
+                btn.textContent = '✗ Failed';
+            } finally {
+                btn.disabled = false;
+            }
+        }
+
+        async function downloadClip(btn) {
+            const audioFile = decodeURIComponent(btn.getAttribute('data-audio'));
+            const start = parseFloat(btn.getAttribute('data-start'));
+            const end = parseFloat(btn.getAttribute('data-end'));
+            const text = decodeURIComponent(btn.getAttribute('data-text'));
+            const filename = text.slice(0, 20).trim().replace(/[^\w\s-]/g, '').replace(/\s+/g, '_').toLowerCase() + '.mp3';
+
+            btn.disabled = true;
+            btn.textContent = '⏳ Clipping...';
+
+            try {
+                const resp = await fetch(API + '/api/clip', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ audio_file: audioFile, start_time: start, end_time: end }),
+                });
+                if (!resp.ok) throw new Error('Failed');
+
+                const blob = await resp.blob();
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+
+                btn.textContent = '✓ Downloaded';
+                setTimeout(() => { btn.textContent = '⬇ Clip this'; }, 2000);
+            } catch (err) {
+                btn.textContent = '✗ Failed';
+                setTimeout(() => { btn.textContent = '⬇ Clip this'; }, 2000);
+            } finally {
+                btn.disabled = false;
+            }
+        }
+
+        /* ── Clip tab ── */
+        const clipBufferSlider = document.getElementById('clip-buffer');
+        const clipBufferVal = document.getElementById('clipBufferVal');
+        clipBufferSlider.addEventListener('input', () => {
+            clipBufferVal.textContent = (clipBufferSlider.value / 10).toFixed(1) + 's';
+        });
+
+        document.getElementById('clip-quote').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') doClip();
+        });
+
+        async function doClip() {
+            const quote = document.getElementById('clip-quote').value.trim();
+            if (!quote) return;
+
+            const btn = document.getElementById('clipBtn');
+            const results = document.getElementById('clip-results');
+            const buffer = clipBufferSlider.value / 10;
+            const outputName = document.getElementById('clip-filename').value.trim() ||
+                quote.slice(0, 20).trim().replace(/[^\w\s-]/g, '').replace(/\s+/g, '_').toLowerCase();
+
+            btn.disabled = true;
+            results.innerHTML = '<div class="status"><span class="spinner"></span>Finding and clipping...</div>';
+
+            try {
+                const resp = await fetch(API + '/api/clip_text', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ quote, buffer, output_name: outputName }),
+                });
+
+                if (!resp.ok) {
+                    const errData = await resp.json();
+                    results.innerHTML = `<div class="no-results"><p>${esc(errData.error || 'Failed to clip')}</p><p>Try the Find tab first to check the exact wording.</p></div>`;
+                    return;
+                }
+
+                const blob = await resp.blob();
+                const url = URL.createObjectURL(blob);
+                const filename = outputName ? (outputName.endsWith('.mp3') ? outputName : outputName + '.mp3') : 'clip.mp3';
+
+                results.innerHTML = `
+                    <div class="clip-result">
+                        <div class="clip-info">Clipped: "<strong>${esc(quote)}</strong>"</div>
+                        <audio controls autoplay src="${url}"></audio>
+                        <div>
+                            <a class="download-link" href="${url}" download="${esc(filename)}">⬇ Download ${esc(filename)}</a>
+                        </div>
+                    </div>`;
+            } catch (err) {
+                results.innerHTML = `<div class="no-results"><p>Error: ${err.message}</p></div>`;
+            } finally {
+                btn.disabled = false;
+            }
+        }
+
+        function esc(s) {
+            const d = document.createElement('div');
+            d.textContent = s;
+            return d.innerHTML;
+        }
+
+        /* ── Popular tab ── */
+        async function loadPopular() {
+            const results = document.getElementById('popular-results');
+            results.innerHTML = '<div class="status"><span class="spinner"></span>Loading...</div>';
+
+            try {
+                const resp = await fetch(API + '/api/popular');
+                const clips = await resp.json();
+
+                if (!clips.length) {
+                    results.innerHTML = '<div class="popular-empty"><p>No clips yet.</p><p>Use Find or Clip to create some!</p></div>';
+                    return;
+                }
+
+                let html = `<div class="results-header">${clips.length} clip${clips.length !== 1 ? 's' : ''}</div>`;
+                clips.forEach((c, i) => {
+                    const rank = i + 1;
+                    const dl = c.count === 1 ? '1 download' : c.count + ' downloads';
+                    html += `
+                        <div class="popular-item">
+                            <div class="popular-rank">${rank}</div>
+                            <div class="popular-info">
+                                <div class="popular-quote" title="${esc(c.quote)}">${esc(c.quote || c.clip_name)}</div>
+                            </div>
+                            <div class="popular-count">${dl}</div>
+                            <div class="popular-actions">
+                                <button class="btn-small" onclick="playPopular(this, '${esc(c.clip_name)}')">▶</button>
+                                <a class="btn-small download-link" href="${API}/api/popular/download/${encodeURIComponent(c.clip_name)}" style="text-decoration:none;text-align:center;color:#fff;">⬇</a>
+                            </div>
+                        </div>`;
+                });
+                results.innerHTML = html;
+            } catch (err) {
+                results.innerHTML = `<div class="no-results"><p>Error: ${err.message}</p></div>`;
+            }
+        }
+
+        async function playPopular(btn, clipName) {
+            btn.disabled = true;
+            btn.textContent = '⏳';
+            try {
+                const resp = await fetch(API + '/api/popular/play/' + encodeURIComponent(clipName));
+                if (!resp.ok) throw new Error('Failed');
+                const blob = await resp.blob();
+                const url = URL.createObjectURL(blob);
+
+                const actions = btn.parentElement;
+                let audio = actions.querySelector('audio');
+                if (audio) { audio.src = url; audio.play(); }
+                else {
+                    audio = document.createElement('audio');
+                    audio.controls = true;
+                    audio.autoplay = true;
+                    audio.src = url;
+                    actions.appendChild(audio);
+                }
+                btn.textContent = '▶';
+            } catch (err) {
+                btn.textContent = '✗';
+            } finally {
+                btn.disabled = false;
+            }
+        }
+    </script>
+</body>
+</html>
