@@ -145,8 +145,9 @@ def _make_clip(audio_file: str, start: float, end: float, buffer: float = 0.3) -
 @app.route("/")
 def index():
     store = Path(app.config.get("STORE", DEFAULT_STORE))
-    cached = list_cached(store)
-    return render_template("index.html", transcript_count=len(cached))
+    # Just count JSON files instead of parsing them all
+    transcript_count = sum(1 for _ in store.rglob("*.json")) if store.exists() else 0
+    return render_template("index.html", transcript_count=transcript_count)
 
 
 @app.route("/api/search", methods=["POST"])
