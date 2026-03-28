@@ -505,10 +505,10 @@
                                 ...${esc(m.context_before)} <span class="highlight">${esc(m.matched_text)}</span> ${esc(m.context_after)}...
                             </div>
                             <div class="match-actions">
-                                <button class="btn-small" data-audio="${encodeURIComponent(m.audio_file)}" data-start="${m.start_time}" data-end="${m.end_time}" onclick="playClip(this)">
+                                <button class="btn-small" data-audio="${encodeURIComponent(m.audio_name)}" data-start="${m.start_time}" data-end="${m.end_time}" onclick="playClip(this)">
                                     ▶ Play
                                 </button>
-                                <button class="btn-small btn-clip-tab" data-audio="${encodeURIComponent(m.audio_file)}" data-start="${m.start_time}" data-end="${m.end_time}" data-text="${encodeURIComponent(m.matched_text)}" onclick="downloadClip(this)">
+                                <button class="btn-small btn-clip-tab" data-audio="${encodeURIComponent(m.audio_name)}" data-start="${m.start_time}" data-end="${m.end_time}" data-text="${encodeURIComponent(m.matched_text)}" onclick="downloadClip(this)">
                                     ⬇ Clip this
                                 </button>
                             </div>
@@ -534,7 +534,7 @@
                 const resp = await fetch(API + '/api/clip', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ audio_file: audioFile, start_time: start, end_time: end }),
+                    body: JSON.stringify({ audio_name: audioFile, start_time: start, end_time: end }),
                 });
 
                 if (!resp.ok) throw new Error('Failed to extract clip');
@@ -574,7 +574,7 @@
                 const resp = await fetch(API + '/api/clip', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ audio_file: audioFile, start_time: start, end_time: end }),
+                    body: JSON.stringify({ audio_name: audioFile, start_time: start, end_time: end }),
                 });
                 if (!resp.ok) throw new Error('Failed');
 

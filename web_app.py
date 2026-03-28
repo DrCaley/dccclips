@@ -30,6 +30,7 @@ from find_quote import (
 app = Flask(__name__)
 CORS(app, origins=["https://drcaley.github.io"])
 
+BOOKS_DIR = Path(__file__).parent / "books"
 CLIPS_DIR = Path(__file__).parent / "clips"
 CLIPS_DIR.mkdir(exist_ok=True)
 CLIP_STATS_FILE = CLIPS_DIR / "_stats.json"
@@ -63,6 +64,23 @@ def _track_clip(clip_name: str, quote: str, audio_name: str, start: float, end: 
             "end": end,
         }
     _save_clip_stats(stats)
+
+
+def _resolve_audio(audio_name: str) -> Path | None:
+    """Safely resolve an audio filename to a path within BOOKS_DIR only.
+
+    Prevents path traversal — rejects anything with slashes or '..'.
+    """
+    # Strip any directory components — only bare filenames allowed
+    safe_name = Path(audio_name).name
+    if safe_name != audio_name or '..' in audio_name:
+        return None
+    # Search recursively within BOOKS_DIR
+    for f in BOOKS_DIR.rglob(safe_name):
+        resolved = f.resolve()
+        if resolved.is_relative_to(BOOKS_DIR.resolve()):
+            return resolved
+    return None
 
 
 def _load_all_transcripts(store: Path) -> list[dict]:
@@ -148,7 +166,6 @@ def api_search():
         ctx = m.get("context", {})
         results.append({
             "score": round(m["score"] * 100),
-            "audio_file": m["audio_file"],
             "audio_name": m["audio_name"],
             "start_time": m["start_time"],
             "end_time": m["end_time"],
@@ -167,15 +184,16 @@ def api_search():
 @app.route("/api/clip", methods=["POST"])
 def api_clip():
     data = request.get_json()
-    audio_file = data.get("audio_file", "")
+    audio_name = data.get("audio_name", "")
     start = float(data.get("start_time", 0))
     end = float(data.get("end_time", 0))
     buffer = float(data.get("buffer", 0.3))
 
-    if not audio_file or not Path(audio_file).exists():
+    audio_path = _resolve_audio(audio_name)
+    if audio_path is None:
         return jsonify({"error": "Audio file not found"}), 404
 
-    clip_path = _make_clip(audio_file, start, end, buffer)
+    clip_path = _make_clip(str(audio_path), start, end, buffer)
     if clip_path is None:
         return jsonify({"error": "Failed to extract clip"}), 500
 
@@ -201,11 +219,11 @@ def api_clip_text():
         return jsonify({"error": f'No match found for "{quote}"'}), 404
 
     best = matches[0]
-    audio_file = best["audio_file"]
-    if not Path(audio_file).exists():
+    audio_path = _resolve_audio(best["audio_name"])
+    if audio_path is None:
         return jsonify({"error": "Audio file not found on disk"}), 404
 
-    clip_path = _make_clip(audio_file, best["start_time"], best["end_time"], buffer)
+    clip_path = _make_clip(str(audio_path), best["start_time"], best["end_time"], buffer)
     if clip_path is None:
         return jsonify({"error": "Failed to extract clip"}), 500
 
@@ -215,7 +233,7 @@ def api_clip_text():
             output_name += ".mp3"
         download_name = output_name
 
-    _track_clip(clip_path.name, quote, Path(audio_file).name, best["start_time"], best["end_time"])
+    _track_clip(clip_path.name, quote, best["audio_name"], best["start_time"], best["end_time"])
     return send_file(
         str(clip_path),
         mimetype="audio/mpeg",
@@ -267,13 +285,6 @@ def api_popular_download(clip_name):
         _save_clip_stats(stats)
     return send_file(str(clip_path), mimetype="audio/mpeg", as_attachment=True,
                      download_name=clip_name)
-
-
-@app.route("/api/transcripts")
-def api_transcripts():
-    store = Path(app.config.get("STORE", DEFAULT_STORE))
-    cached = list_cached(store)
-    return jsonify(cached)
 
 
 def main():
