@@ -174,7 +174,7 @@ def api_clip():
     if clip_path is None:
         return jsonify({"error": "Failed to extract clip"}), 500
 
-    if quote:
+    if quote and data.get("track"):
         _track_clip(clip_path.name, quote, audio_name, start, end)
 
     return send_file(str(clip_path), mimetype="audio/mpeg")

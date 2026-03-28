@@ -573,7 +573,7 @@
                 const resp = await fetch('/api/clip', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ audio_name: audioFile, start_time: start, end_time: end, matched_text: text }),
+                    body: JSON.stringify({ audio_name: audioFile, start_time: start, end_time: end, matched_text: text, track: true }),
                 });
                 if (!resp.ok) throw new Error('Failed');
 
