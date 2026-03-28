@@ -28,7 +28,10 @@ import sys
 import warnings
 from pathlib import Path
 
-import whisper
+try:
+    import whisper
+except ImportError:
+    whisper = None
 from rapidfuzz import fuzz
 
 DEFAULT_STORE = Path(__file__).parent / "transcripts"
@@ -112,6 +115,8 @@ def list_cached(store_dir: Path) -> list[dict]:
 
 def transcribe_audio(audio_path: str, model_name: str = "base") -> list[dict]:
     """Transcribe audio and return word-level timestamps."""
+    if whisper is None:
+        raise RuntimeError("openai-whisper is not installed. Install it with: pip install openai-whisper")
     print(f"Loading Whisper model '{model_name}'...")
     model = whisper.load_model(model_name)
     print(f"Transcribing '{audio_path}' (this may take a while)...")
