@@ -6,12 +6,17 @@ contain query words.
 """
 
 import json
+import time
 from collections import Counter
 from pathlib import Path
 
 from rapidfuzz import fuzz
 
 from find_quote import normalize, _get_context
+
+# Long queries blow up: 30 words → 22 window sizes × thousands of positions.
+# Step through window sizes + time limit keeps searches bounded.
+_SEARCH_TIME_LIMIT = 15.0   # seconds
 
 
 class SearchIndex:
@@ -61,6 +66,18 @@ class SearchIndex:
         max_win = int(count * 1.4) + 1
         cutoff = int(threshold * 100)
 
+        # For long queries, step through window sizes to limit work
+        win_range = max_win - min_win + 1
+        if win_range > 8:
+            step = max(1, win_range // 6)
+            win_sizes = list(range(min_win, max_win + 1, step))
+            # Always include the exact-length window
+            if count not in win_sizes:
+                win_sizes.append(count)
+                win_sizes.sort()
+        else:
+            win_sizes = list(range(min_win, max_win + 1))
+
         # Find transcripts containing enough unique query words
         transcript_hits = Counter()
         for qw in query_word_set:
@@ -68,10 +85,13 @@ class SearchIndex:
                 transcript_hits[tidx] += 1
 
         all_matches = []
+        t_start = time.monotonic()
 
         for tidx, unique_hit_count in transcript_hits.items():
             if unique_hit_count < min_hits:
                 continue
+            if (time.monotonic() - t_start) > _SEARCH_TIME_LIMIT:
+                break
 
             t = self.transcripts[tidx]
             norm_words = t["norm_words"]
@@ -98,7 +118,9 @@ class SearchIndex:
 
             # ── Pass 2: fuzzy match candidate windows ──
             matches = []
-            for win_size in range(min_win, max_win + 1):
+            for win_size in win_sizes:
+                if win_size > n:
+                    continue
                 for i in range(n - win_size + 1):
                     if not full_scan and i not in candidate_positions:
                         continue
