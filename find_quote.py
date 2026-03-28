@@ -377,12 +377,22 @@ def _get_context(words: list[dict], start_time: float, end_time: float,
     before_words = words[before_start:match_start_idx]
     after_words = words[match_end_idx + 1:after_end]
 
+    # Build word-level list with selection flags for the frontend
+    context_word_list = []
+    for w in before_words:
+        context_word_list.append({"word": w["word"], "start": w["start"], "end": w["end"], "sel": False})
+    for w in words[match_start_idx:match_end_idx + 1]:
+        context_word_list.append({"word": w["word"], "start": w["start"], "end": w["end"], "sel": True})
+    for w in after_words:
+        context_word_list.append({"word": w["word"], "start": w["start"], "end": w["end"], "sel": False})
+
     return {
         "before": " ".join(w["word"] for w in before_words),
         "before_start": before_words[0]["start"] if before_words else start_time,
         "match": " ".join(w["word"] for w in words[match_start_idx:match_end_idx + 1]),
         "after": " ".join(w["word"] for w in after_words),
         "after_end": after_words[-1]["end"] if after_words else end_time,
+        "words": context_word_list,
     }
 
 

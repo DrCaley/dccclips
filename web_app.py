@@ -152,6 +152,7 @@ def api_search():
             "context_after": ctx.get("after", ""),
             "context_start": fmt_time(ctx["before_start"]) if "before_start" in ctx else "",
             "context_end": fmt_time(ctx["after_end"]) if "after_end" in ctx else "",
+            "context_words": ctx.get("words", []),
         })
 
     return jsonify({"quote": quote, "count": len(results), "results": results})

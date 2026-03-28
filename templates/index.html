@@ -215,14 +215,50 @@
 
         .match-context {
             font-size: 0.85rem;
-            line-height: 1.5;
+            line-height: 1.8;
             margin-bottom: 12px;
             color: #777;
+            user-select: none;
         }
 
-        .match-context .highlight {
+        .match-context .ctx-word {
+            cursor: pointer;
+            padding: 2px 1px;
+            border-radius: 3px;
+            transition: background 0.15s, color 0.15s;
+        }
+
+        .match-context .ctx-word:hover {
+            background: #2a2a3a;
+        }
+
+        .match-context .ctx-word.selected {
             color: #fff;
             font-weight: 500;
+            background: rgba(232, 197, 71, 0.15);
+        }
+
+        .match-context .ctx-word.sel-start {
+            border-left: 2px solid #e8c547;
+            padding-left: 3px;
+        }
+
+        .match-context .ctx-word.sel-end {
+            border-right: 2px solid #e8c547;
+            padding-right: 3px;
+        }
+
+        .selection-hint {
+            font-size: 0.75rem;
+            color: #555;
+            margin-bottom: 8px;
+        }
+
+        .match-time-live {
+            font-family: 'SF Mono', 'Fira Code', monospace;
+            font-size: 0.8rem;
+            color: #e8c547;
+            margin-left: 8px;
         }
 
         .match-text em {
@@ -375,7 +411,6 @@
 
         <div class="tabs">
             <button class="tab active" onclick="switchTab('find')">Find</button>
-            <button class="tab" onclick="switchTab('clip')">Clip</button>
             <button class="tab" onclick="switchTab('popular')">Popular</button>
         </div>
 
@@ -400,31 +435,6 @@
             <div id="find-results"></div>
         </div>
 
-        <!-- CLIP TAB -->
-        <div id="tab-clip" class="tab-panel">
-            <p class="tab-desc">Paste the exact text you want. It gets matched and the audio clip is extracted instantly.</p>
-
-            <div class="search-box">
-                <input type="text" id="clip-quote" placeholder="Paste the exact quote to extract..."
-                       autocomplete="off">
-                <button id="clipBtn" onclick="doClip()">Clip</button>
-            </div>
-
-            <div class="options">
-                <label>
-                    Filename:
-                    <input type="text" class="filename-input" id="clip-filename" placeholder="my_clip (optional)">
-                </label>
-                <label>
-                    Buffer:
-                    <input type="range" id="clip-buffer" min="0" max="20" value="3">
-                    <span id="clipBufferVal">0.3s</span>
-                </label>
-            </div>
-
-            <div id="clip-results"></div>
-        </div>
-
         <!-- POPULAR TAB -->
         <div id="tab-popular" class="tab-panel">
             <p class="tab-desc">Most-requested clips, sorted by how many times they've been played.</p>
@@ -439,8 +449,7 @@
             document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
             document.getElementById('tab-' + tab).classList.add('active');
             document.querySelector(`.tab[onclick="switchTab('${tab}')"]`).classList.add('active');
-            if (tab === 'clip') document.getElementById('clip-quote').focus();
-            else if (tab === 'find') document.getElementById('find-quote').focus();
+            if (tab === 'find') document.getElementById('find-quote').focus();
             else if (tab === 'popular') loadPopular();
         }
 
@@ -490,30 +499,70 @@
 
                 let html = `<div class="results-header">${data.count} match${data.count !== 1 ? 'es' : ''} for "${esc(quote)}"</div>`;
 
-                for (const m of data.results) {
+                data.results.forEach((m, idx) => {
                     const scoreClass = m.score >= 90 ? 'score-high' : m.score >= 75 ? 'score-mid' : 'score-low';
+
+                    // Build context words as clickable spans
+                    let wordsHtml = '';
+                    const cw = m.context_words || [];
+                    cw.forEach((w, wi) => {
+                        const cls = w.sel ? 'ctx-word selected' : 'ctx-word';
+                        wordsHtml += `<span class="${cls}" data-idx="${wi}" data-start="${w.start}" data-end="${w.end}" data-match="${idx}">${esc(w.word)}</span> `;
+                    });
+
+                    // Fallback if no word-level data
+                    if (!cw.length) {
+                        wordsHtml = `...${esc(m.context_before)} <span class="selected">${esc(m.matched_text)}</span> ${esc(m.context_after)}...`;
+                    }
+
                     html += `
-                        <div class="match">
+                        <div class="match" id="match-${idx}">
                             <div class="match-header">
                                 <span class="match-score ${scoreClass}">${m.score}%</span>
-                                <span class="match-time">${m.start_fmt} → ${m.end_fmt}</span>
+                                <span class="match-time">${m.start_fmt} → ${m.end_fmt}<span class="match-time-live" id="live-time-${idx}"></span></span>
                             </div>
                             <div class="match-file" title="${esc(m.audio_name)}" style="display:none">${esc(m.audio_name)}</div>
-                            <div class="match-context">
-                                ...${esc(m.context_before)} <span class="highlight">${esc(m.matched_text)}</span> ${esc(m.context_after)}...
+                            <div class="selection-hint">Click a word to adjust clip boundaries</div>
+                            <div class="match-context" id="ctx-${idx}">
+                                ${wordsHtml}
                             </div>
-                            <div class="match-actions">
-                                <button class="btn-small" data-audio="${encodeURIComponent(m.audio_name)}" data-start="${m.start_time}" data-end="${m.end_time}" data-text="${encodeURIComponent(m.matched_text)}" onclick="playClip(this)">
+                            <div class="match-actions" id="actions-${idx}">
+                                <button class="btn-small" data-match="${idx}" onclick="playSelection(${idx})">
                                     ▶ Play
                                 </button>
-                                <button class="btn-small btn-clip-tab" data-audio="${encodeURIComponent(m.audio_name)}" data-start="${m.start_time}" data-end="${m.end_time}" data-text="${encodeURIComponent(m.matched_text)}" onclick="downloadClip(this)">
-                                    ⬇ Clip this
+                                <button class="btn-small btn-clip-tab" data-match="${idx}" onclick="downloadSelection(${idx})">
+                                    ⬇ Download
                                 </button>
                             </div>
                         </div>`;
-                }
+                });
 
                 results.innerHTML = html;
+
+                // Store match data for selection logic
+                window._matchData = data.results;
+                window._selections = {};
+                data.results.forEach((m, idx) => {
+                    const cw = m.context_words || [];
+                    // Find initial selection range
+                    let selStart = -1, selEnd = -1;
+                    cw.forEach((w, wi) => {
+                        if (w.sel) {
+                            if (selStart === -1) selStart = wi;
+                            selEnd = wi;
+                        }
+                    });
+                    window._selections[idx] = { start: selStart, end: selEnd };
+                });
+
+                // Attach word click handlers
+                document.querySelectorAll('.ctx-word').forEach(span => {
+                    span.addEventListener('click', (e) => {
+                        const matchIdx = parseInt(span.getAttribute('data-match'));
+                        const wordIdx = parseInt(span.getAttribute('data-idx'));
+                        handleWordClick(matchIdx, wordIdx, e.shiftKey);
+                    });
+                });
             } catch (err) {
                 results.innerHTML = `<div class="no-results"><p>Error: ${err.message}</p></div>`;
             } finally {
@@ -521,11 +570,75 @@
             }
         }
 
-        async function playClip(btn) {
-            const audioFile = decodeURIComponent(btn.getAttribute('data-audio'));
-            const start = parseFloat(btn.getAttribute('data-start'));
-            const end = parseFloat(btn.getAttribute('data-end'));
-            const text = decodeURIComponent(btn.getAttribute('data-text') || '');
+        function handleWordClick(matchIdx, wordIdx, isShift) {
+            const sel = window._selections[matchIdx];
+            if (!sel || sel.start === -1) return;
+
+            if (wordIdx <= sel.start) {
+                // Clicked before/at start → move start
+                sel.start = wordIdx;
+            } else if (wordIdx >= sel.end) {
+                // Clicked after/at end → move end
+                sel.end = wordIdx;
+            } else {
+                // Clicked inside selection → move whichever boundary is closer
+                if ((wordIdx - sel.start) <= (sel.end - wordIdx)) {
+                    sel.start = wordIdx;
+                } else {
+                    sel.end = wordIdx;
+                }
+            }
+
+            updateSelectionUI(matchIdx);
+        }
+
+        function updateSelectionUI(matchIdx) {
+            const sel = window._selections[matchIdx];
+            const ctx = document.getElementById('ctx-' + matchIdx);
+            if (!ctx || !sel) return;
+
+            const spans = ctx.querySelectorAll('.ctx-word');
+            spans.forEach(span => {
+                const wi = parseInt(span.getAttribute('data-idx'));
+                span.classList.toggle('selected', wi >= sel.start && wi <= sel.end);
+                span.classList.toggle('sel-start', wi === sel.start);
+                span.classList.toggle('sel-end', wi === sel.end);
+            });
+
+            // Update live time display
+            const startSpan = ctx.querySelector(`.ctx-word[data-idx="${sel.start}"]`);
+            const endSpan = ctx.querySelector(`.ctx-word[data-idx="${sel.end}"]`);
+            const liveTime = document.getElementById('live-time-' + matchIdx);
+            if (startSpan && endSpan && liveTime) {
+                const s = parseFloat(startSpan.getAttribute('data-start'));
+                const e = parseFloat(endSpan.getAttribute('data-end'));
+                liveTime.textContent = `  ✂ ${fmtTime(s)} → ${fmtTime(e)}`;
+            }
+        }
+
+        function fmtTime(t) {
+            const m = Math.floor(t / 60);
+            const s = (t % 60).toFixed(1);
+            return m + ':' + s.padStart(4, '0');
+        }
+
+        function getSelectionTimes(matchIdx) {
+            const sel = window._selections[matchIdx];
+            const m = window._matchData[matchIdx];
+            if (!sel || sel.start === -1) {
+                return { start: m.start_time, end: m.end_time, text: m.matched_text, audio: m.audio_name };
+            }
+            const cw = m.context_words || [];
+            const start = cw[sel.start]?.start ?? m.start_time;
+            const end = cw[sel.end]?.end ?? m.end_time;
+            const text = cw.slice(sel.start, sel.end + 1).map(w => w.word).join(' ');
+            return { start, end, text, audio: m.audio_name };
+        }
+
+        async function playSelection(matchIdx) {
+            const { start, end, text, audio } = getSelectionTimes(matchIdx);
+            const actions = document.getElementById('actions-' + matchIdx);
+            const btn = actions.querySelector('button');
             btn.disabled = true;
             btn.textContent = '⏳ Loading...';
 
@@ -533,7 +646,7 @@
                 const resp = await fetch('/api/clip', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ audio_name: audioFile, start_time: start, end_time: end, matched_text: text }),
+                    body: JSON.stringify({ audio_name: audio, start_time: start, end_time: end, matched_text: text }),
                 });
 
                 if (!resp.ok) throw new Error('Failed to extract clip');
@@ -541,16 +654,17 @@
                 const blob = await resp.blob();
                 const url = URL.createObjectURL(blob);
 
-                const audio = document.createElement('audio');
-                audio.controls = true;
-                audio.autoplay = true;
-                audio.src = url;
-
-                const actions = btn.parentElement;
-                const existing = actions.querySelector('audio');
-                if (existing) existing.remove();
-
-                actions.appendChild(audio);
+                let audioEl = actions.querySelector('audio');
+                if (audioEl) {
+                    audioEl.src = url;
+                    audioEl.play();
+                } else {
+                    audioEl = document.createElement('audio');
+                    audioEl.controls = true;
+                    audioEl.autoplay = true;
+                    audioEl.src = url;
+                    actions.appendChild(audioEl);
+                }
                 btn.textContent = '▶ Play';
             } catch (err) {
                 btn.textContent = '✗ Failed';
@@ -559,12 +673,11 @@
             }
         }
 
-        async function downloadClip(btn) {
-            const audioFile = decodeURIComponent(btn.getAttribute('data-audio'));
-            const start = parseFloat(btn.getAttribute('data-start'));
-            const end = parseFloat(btn.getAttribute('data-end'));
-            const text = decodeURIComponent(btn.getAttribute('data-text'));
+        async function downloadSelection(matchIdx) {
+            const { start, end, text, audio } = getSelectionTimes(matchIdx);
             const filename = text.slice(0, 20).trim().replace(/[^\w\s-]/g, '').replace(/\s+/g, '_').toLowerCase() + '.mp3';
+            const actions = document.getElementById('actions-' + matchIdx);
+            const btn = actions.querySelectorAll('button')[1];
 
             btn.disabled = true;
             btn.textContent = '⏳ Clipping...';
@@ -573,7 +686,7 @@
                 const resp = await fetch('/api/clip', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ audio_name: audioFile, start_time: start, end_time: end, matched_text: text, track: true }),
+                    body: JSON.stringify({ audio_name: audio, start_time: start, end_time: end, matched_text: text, track: true }),
                 });
                 if (!resp.ok) throw new Error('Failed');
 
@@ -588,66 +701,10 @@
                 URL.revokeObjectURL(url);
 
                 btn.textContent = '✓ Downloaded';
-                setTimeout(() => { btn.textContent = '⬇ Clip this'; }, 2000);
+                setTimeout(() => { btn.textContent = '⬇ Download'; }, 2000);
             } catch (err) {
                 btn.textContent = '✗ Failed';
-                setTimeout(() => { btn.textContent = '⬇ Clip this'; }, 2000);
-            } finally {
-                btn.disabled = false;
-            }
-        }
-
-        /* ── Clip tab ── */
-        const clipBufferSlider = document.getElementById('clip-buffer');
-        const clipBufferVal = document.getElementById('clipBufferVal');
-        clipBufferSlider.addEventListener('input', () => {
-            clipBufferVal.textContent = (clipBufferSlider.value / 10).toFixed(1) + 's';
-        });
-
-        document.getElementById('clip-quote').addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') doClip();
-        });
-
-        async function doClip() {
-            const quote = document.getElementById('clip-quote').value.trim();
-            if (!quote) return;
-
-            const btn = document.getElementById('clipBtn');
-            const results = document.getElementById('clip-results');
-            const buffer = clipBufferSlider.value / 10;
-            const outputName = document.getElementById('clip-filename').value.trim() ||
-                quote.slice(0, 20).trim().replace(/[^\w\s-]/g, '').replace(/\s+/g, '_').toLowerCase();
-
-            btn.disabled = true;
-            results.innerHTML = '<div class="status"><span class="spinner"></span>Finding and clipping...</div>';
-
-            try {
-                const resp = await fetch('/api/clip_text', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ quote, buffer, output_name: outputName }),
-                });
-
-                if (!resp.ok) {
-                    const errData = await resp.json();
-                    results.innerHTML = `<div class="no-results"><p>${esc(errData.error || 'Failed to clip')}</p><p>Try the Find tab first to check the exact wording.</p></div>`;
-                    return;
-                }
-
-                const blob = await resp.blob();
-                const url = URL.createObjectURL(blob);
-                const filename = outputName ? (outputName.endsWith('.mp3') ? outputName : outputName + '.mp3') : 'clip.mp3';
-
-                results.innerHTML = `
-                    <div class="clip-result">
-                        <div class="clip-info">Clipped: "<strong>${esc(quote)}</strong>"</div>
-                        <audio controls autoplay src="${url}"></audio>
-                        <div>
-                            <a class="download-link" href="${url}" download="${esc(filename)}">⬇ Download ${esc(filename)}</a>
-                        </div>
-                    </div>`;
-            } catch (err) {
-                results.innerHTML = `<div class="no-results"><p>Error: ${err.message}</p></div>`;
+                setTimeout(() => { btn.textContent = '⬇ Download'; }, 2000);
             } finally {
                 btn.disabled = false;
             }
