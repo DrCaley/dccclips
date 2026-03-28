@@ -13,19 +13,14 @@ import json
 import os
 import subprocess
 import tempfile
+import time
 from pathlib import Path
 
 from flask import Flask, render_template, request, jsonify, send_file
 from flask_cors import CORS
 
-# Reuse the core logic from find_quote.py
-from find_quote import (
-    DEFAULT_STORE,
-    find_quote,
-    fmt_time,
-    list_cached,
-    _get_context,
-)
+from find_quote import DEFAULT_STORE, fmt_time
+from search_index import SearchIndex
 
 app = Flask(__name__)
 CORS(app, origins=["https://drcaley.github.io"])
@@ -34,6 +29,12 @@ BOOKS_DIR = Path(__file__).parent / "books"
 CLIPS_DIR = Path(__file__).parent / "clips"
 CLIPS_DIR.mkdir(exist_ok=True)
 CLIP_STATS_FILE = CLIPS_DIR / "_stats.json"
+
+# Build inverted index at startup (loaded once, used for all requests)
+print("Building search index...")
+_t0 = time.time()
+search_idx = SearchIndex(DEFAULT_STORE)
+print(f"Index ready: {search_idx.transcript_count} transcripts in {time.time()-_t0:.1f}s")
 
 
 def _load_clip_stats() -> dict:
@@ -83,32 +84,7 @@ def _resolve_audio(audio_name: str) -> Path | None:
     return None
 
 
-def _load_all_transcripts(store: Path) -> list[dict]:
-    """Load all cached transcripts."""
-    transcripts = []
-    if not store.exists():
-        return transcripts
-    for tf in sorted(store.rglob("*.json")):
-        with open(tf) as f:
-            transcripts.append(json.load(f))
-    return transcripts
 
-
-def _search_all(quote: str, threshold: float, store: Path) -> list[dict]:
-    """Search all transcripts for a quote."""
-    all_matches = []
-    for data in _load_all_transcripts(store):
-        audio_file = data.get("audio_file", "?")
-        words = data.get("words", [])
-        matches = find_quote(words, quote, threshold)
-        for m in matches:
-            m["audio_file"] = audio_file
-            m["audio_name"] = Path(audio_file).name
-            m["context"] = _get_context(words, m["start_time"], m["end_time"])
-        all_matches.extend(matches)
-
-    all_matches.sort(key=lambda m: m["score"], reverse=True)
-    return all_matches
 
 
 def _make_clip(audio_file: str, start: float, end: float, buffer: float = 0.3) -> Path | None:
@@ -159,8 +135,7 @@ def api_search():
     if not quote:
         return jsonify({"error": "No quote provided"}), 400
 
-    store = Path(app.config.get("STORE", DEFAULT_STORE))
-    matches = _search_all(quote, threshold, store)
+    matches = search_idx.search(quote, threshold)
 
     results = []
     for m in matches:
@@ -217,8 +192,7 @@ def api_clip_text():
     if not quote:
         return jsonify({"error": "No text provided"}), 400
 
-    store = Path(app.config.get("STORE", DEFAULT_STORE))
-    matches = _search_all(quote, threshold, store)
+    matches = search_idx.search(quote, threshold)
 
     if not matches:
         return jsonify({"error": f'No match found for "{quote}"'}), 404
@@ -302,7 +276,9 @@ def main():
     parser.add_argument("--debug", action="store_true")
     args = parser.parse_args()
 
-    app.config["STORE"] = args.store
+    if args.store != str(DEFAULT_STORE):
+        global search_idx
+        search_idx = SearchIndex(Path(args.store))
     print(f"\nAudio Quote Finder — Web UI")
     print(f"Transcript store: {args.store}")
     print(f"Open http://{args.host}:{args.port}\n")
