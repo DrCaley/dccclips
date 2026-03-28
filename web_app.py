@@ -154,6 +154,9 @@ def api_search():
     data = request.get_json()
     quote = data.get("quote", "").strip()
     threshold = float(data.get("threshold", 0.70))
+    # Client sends 0-100 (e.g. 70), find_quote expects 0-1 (e.g. 0.70)
+    if threshold > 1:
+        threshold /= 100.0
 
     if not quote:
         return jsonify({"error": "No quote provided"}), 400
