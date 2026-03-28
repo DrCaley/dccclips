@@ -700,11 +700,7 @@
             btn.disabled = true;
             btn.textContent = '⏳';
             try {
-                const resp = await fetch('/api/popular/play/' + encodeURIComponent(clipName));
-                if (!resp.ok) throw new Error('Failed');
-                const blob = await resp.blob();
-                const url = URL.createObjectURL(blob);
-
+                const url = '/api/popular/play/' + encodeURIComponent(clipName);
                 const actions = btn.parentElement;
                 let audio = actions.querySelector('audio');
                 if (audio) { audio.src = url; audio.play(); }
