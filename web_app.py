@@ -142,12 +142,18 @@ def _make_clip(audio_file: str, start: float, end: float, buffer: float = 0.3) -
     return None
 
 
+_transcript_count_cache = {"count": None, "time": 0}
+
 @app.route("/")
 def index():
-    store = Path(app.config.get("STORE", DEFAULT_STORE))
-    # Just count JSON files instead of parsing them all
-    transcript_count = sum(1 for _ in store.rglob("*.json")) if store.exists() else 0
-    return render_template("index.html", transcript_count=transcript_count)
+    import time as _time
+    now = _time.time()
+    # Cache transcript count for 5 minutes
+    if _transcript_count_cache["count"] is None or now - _transcript_count_cache["time"] > 300:
+        store = Path(app.config.get("STORE", DEFAULT_STORE))
+        _transcript_count_cache["count"] = sum(1 for _ in store.rglob("*.json")) if store.exists() else 0
+        _transcript_count_cache["time"] = now
+    return render_template("index.html", transcript_count=_transcript_count_cache["count"])
 
 
 @app.route("/api/search", methods=["POST"])
