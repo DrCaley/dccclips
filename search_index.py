@@ -21,10 +21,15 @@ _MAX_RESULTS = 50           # stop scanning once we have enough good results
 
 
 class SearchIndex:
-    """In-memory inverted index over pre-loaded transcripts."""
+    """In-memory inverted index over pre-loaded transcripts.
+
+    Only keeps normalized words in memory (strings). Raw word dicts with
+    timestamps are loaded on-demand for matching transcripts to save RAM
+    on the 1GB OCI VM.
+    """
 
     def __init__(self, store: Path):
-        self.transcripts: list[dict] = []   # [{audio_file, words, norm_words}]
+        self.transcripts: list[dict] = []   # [{audio_file, norm_words, path}]
         self.index: dict[str, list[int]] = {}  # norm_word → [tidx, ...]
         self.transcript_count = 0
         self._build(store)
@@ -40,14 +45,19 @@ class SearchIndex:
             tidx = len(self.transcripts)
             self.transcripts.append({
                 "audio_file": data.get("audio_file", "?"),
-                "words": words,
                 "norm_words": norm_words,
+                "path": str(tf),
             })
             # Index unique words per transcript (not per position)
             for nw in set(norm_words):
                 if nw:
                     self.index.setdefault(nw, []).append(tidx)
         self.transcript_count = len(self.transcripts)
+
+    def _load_words(self, tidx: int) -> list[dict]:
+        """Load raw word dicts (with timestamps) for a transcript."""
+        with open(self.transcripts[tidx]["path"]) as f:
+            return json.load(f).get("words", [])
 
     def search(self, quote: str, threshold: float = 0.70) -> list[dict]:
         """Search all indexed transcripts for a quote using fuzzy matching.
@@ -94,14 +104,11 @@ class SearchIndex:
         for tidx, unique_hit_count in ranked:
             if unique_hit_count < min_hits:
                 break  # sorted desc, so all remaining are below threshold
-            if len(all_matches) >= _MAX_RESULTS:
-                break
             if (time.monotonic() - t_start) > _SEARCH_TIME_LIMIT:
                 break
 
             t = self.transcripts[tidx]
             norm_words = t["norm_words"]
-            words = t["words"]
             n = len(norm_words)
 
             # ── Pass 1: candidate regions via exact word hits ──
@@ -123,7 +130,8 @@ class SearchIndex:
             full_scan = len(candidate_positions) == 0
 
             # ── Pass 2: fuzzy match candidate windows ──
-            matches = []
+            # First pass: find matching positions using only norm_words
+            hit_positions = []  # (score, start_idx, win_size)
             for win_size in win_sizes:
                 if win_size > n:
                     continue
@@ -133,14 +141,23 @@ class SearchIndex:
                     window_text = " ".join(norm_words[i : i + win_size])
                     score = fuzz.ratio(quote_norm, window_text, score_cutoff=cutoff)
                     if score > 0:
-                        matches.append({
-                            "score": score / 100.0,
-                            "start_time": words[i]["start"],
-                            "end_time": words[i + win_size - 1]["end"],
-                            "matched_text": " ".join(
-                                w["word"] for w in words[i : i + win_size]
-                            ),
-                        })
+                        hit_positions.append((score / 100.0, i, win_size))
+
+            if not hit_positions:
+                continue
+
+            # Load raw words with timestamps only if we have matches
+            words = self._load_words(tidx)
+            matches = []
+            for score, i, win_size in hit_positions:
+                matches.append({
+                    "score": score,
+                    "start_time": words[i]["start"],
+                    "end_time": words[i + win_size - 1]["end"],
+                    "matched_text": " ".join(
+                        w["word"] for w in words[i : i + win_size]
+                    ),
+                })
 
             # Filter overlapping results within this transcript
             matches.sort(key=lambda m: m["score"], reverse=True)
@@ -161,4 +178,4 @@ class SearchIndex:
                     all_matches.append(m)
 
         all_matches.sort(key=lambda m: m["score"], reverse=True)
-        return all_matches
+        return all_matches[:_MAX_RESULTS]
