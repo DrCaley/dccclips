@@ -16,7 +16,8 @@ from find_quote import normalize, _get_context
 
 # Long queries blow up: 30 words → 22 window sizes × thousands of positions.
 # Step through window sizes + time limit keeps searches bounded.
-_SEARCH_TIME_LIMIT = 15.0   # seconds
+_SEARCH_TIME_LIMIT = 12.0   # seconds
+_MAX_RESULTS = 50           # stop scanning once we have enough good results
 
 
 class SearchIndex:
@@ -84,12 +85,17 @@ class SearchIndex:
             for tidx in self.index.get(qw, []):
                 transcript_hits[tidx] += 1
 
+        # Search best-matching transcripts first (most unique query words)
+        ranked = sorted(transcript_hits.items(), key=lambda x: x[1], reverse=True)
+
         all_matches = []
         t_start = time.monotonic()
 
-        for tidx, unique_hit_count in transcript_hits.items():
+        for tidx, unique_hit_count in ranked:
             if unique_hit_count < min_hits:
-                continue
+                break  # sorted desc, so all remaining are below threshold
+            if len(all_matches) >= _MAX_RESULTS:
+                break
             if (time.monotonic() - t_start) > _SEARCH_TIME_LIMIT:
                 break
 
