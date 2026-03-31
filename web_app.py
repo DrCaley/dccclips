@@ -87,14 +87,14 @@ def _resolve_audio(audio_name: str) -> Path | None:
 
 
 
-def _make_clip(audio_file: str, start: float, end: float, buffer: float = 0.3) -> Path | None:
+def _make_clip(audio_file: str, start: float, end: float, start_buffer: float = 0.3, end_buffer: float = 0.3) -> Path | None:
     """Extract a clip and return the path to the file. Max 30 seconds."""
     MAX_CLIP_SECONDS = 30
     if (end - start) > MAX_CLIP_SECONDS:
         end = start + MAX_CLIP_SECONDS
 
-    ss = max(0, start - buffer)
-    to = end + buffer
+    ss = max(0, start - start_buffer)
+    to = end + end_buffer
 
     # Deterministic filename based on source + times + buffer
     safe_name = Path(audio_file).stem.replace(" ", "_")[:50]
@@ -164,14 +164,15 @@ def api_clip():
     audio_name = data.get("audio_name", "")
     start = float(data.get("start_time", 0))
     end = float(data.get("end_time", 0))
-    buffer = float(data.get("buffer", 0.3))
+    start_buffer = float(data.get("start_buffer", 0.3))
+    end_buffer = float(data.get("end_buffer", 0.3))
     quote = data.get("matched_text", "")
 
     audio_path = _resolve_audio(audio_name)
     if audio_path is None:
         return jsonify({"error": "Audio file not found"}), 404
 
-    clip_path = _make_clip(str(audio_path), start, end, buffer)
+    clip_path = _make_clip(str(audio_path), start, end, start_buffer, end_buffer)
     if clip_path is None:
         return jsonify({"error": "Failed to extract clip"}), 500
 

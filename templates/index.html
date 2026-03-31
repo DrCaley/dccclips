@@ -399,6 +399,33 @@
             padding: 40px;
             color: #666;
         }
+
+        .buffer-controls {
+            display: flex;
+            gap: 20px;
+            align-items: center;
+            margin-bottom: 12px;
+            font-size: 0.8rem;
+            color: #888;
+            flex-wrap: wrap;
+        }
+
+        .buffer-controls label {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .buffer-controls input[type="range"] {
+            width: 100px;
+            accent-color: #e8c547;
+        }
+
+        .buffer-controls .buf-val {
+            font-family: 'SF Mono', 'Fira Code', monospace;
+            color: #e8c547;
+            min-width: 28px;
+        }
     </style>
 </head>
 <body>
@@ -523,6 +550,20 @@
                             <div class="match-context" id="ctx-${idx}">
                                 ${wordsHtml}
                             </div>
+                            <div class="buffer-controls" id="buffers-${idx}">
+                                <label>
+                                    Start buffer:
+                                    <input type="range" min="0" max="3" step="0.1" value="0.3"
+                                           oninput="updateBuffer(${idx})" id="buf-start-${idx}">
+                                    <span class="buf-val" id="buf-start-val-${idx}">0.3s</span>
+                                </label>
+                                <label>
+                                    End buffer:
+                                    <input type="range" min="0" max="3" step="0.1" value="0.3"
+                                           oninput="updateBuffer(${idx})" id="buf-end-${idx}">
+                                    <span class="buf-val" id="buf-end-val-${idx}">0.3s</span>
+                                </label>
+                            </div>
                             <div class="match-actions" id="actions-${idx}">
                                 <button class="btn-small" data-match="${idx}" onclick="playSelection(${idx})">
                                     ▶ Play
@@ -602,14 +643,20 @@
                 span.classList.toggle('sel-end', wi === sel.end);
             });
 
-            // Update live time display
+            // Update live time display (including buffers)
             const startSpan = ctx.querySelector(`.ctx-word[data-idx="${sel.start}"]`);
             const endSpan = ctx.querySelector(`.ctx-word[data-idx="${sel.end}"]`);
             const liveTime = document.getElementById('live-time-' + matchIdx);
             if (startSpan && endSpan && liveTime) {
                 const s = parseFloat(startSpan.getAttribute('data-start'));
                 const e = parseFloat(endSpan.getAttribute('data-end'));
-                liveTime.textContent = `  ✂ ${fmtTime(s)} → ${fmtTime(e)}`;
+                const startBufEl = document.getElementById('buf-start-' + matchIdx);
+                const endBufEl = document.getElementById('buf-end-' + matchIdx);
+                const sb = startBufEl ? parseFloat(startBufEl.value) : 0.3;
+                const eb = endBufEl ? parseFloat(endBufEl.value) : 0.3;
+                const clipStart = Math.max(0, s - sb);
+                const clipEnd = e + eb;
+                liveTime.textContent = `  ✂ ${fmtTime(clipStart)} → ${fmtTime(clipEnd)}`;
             }
         }
 
@@ -619,21 +666,33 @@
             return m + ':' + s.padStart(4, '0');
         }
 
+        function updateBuffer(matchIdx) {
+            const startBuf = document.getElementById('buf-start-' + matchIdx);
+            const endBuf = document.getElementById('buf-end-' + matchIdx);
+            document.getElementById('buf-start-val-' + matchIdx).textContent = parseFloat(startBuf.value).toFixed(1) + 's';
+            document.getElementById('buf-end-val-' + matchIdx).textContent = parseFloat(endBuf.value).toFixed(1) + 's';
+            updateSelectionUI(matchIdx);
+        }
+
         function getSelectionTimes(matchIdx) {
             const sel = window._selections[matchIdx];
             const m = window._matchData[matchIdx];
+            const startBufEl = document.getElementById('buf-start-' + matchIdx);
+            const endBufEl = document.getElementById('buf-end-' + matchIdx);
+            const startBuf = startBufEl ? parseFloat(startBufEl.value) : 0.3;
+            const endBuf = endBufEl ? parseFloat(endBufEl.value) : 0.3;
             if (!sel || sel.start === -1) {
-                return { start: m.start_time, end: m.end_time, text: m.matched_text, audio: m.audio_name };
+                return { start: m.start_time, end: m.end_time, text: m.matched_text, audio: m.audio_name, startBuf, endBuf };
             }
             const cw = m.context_words || [];
             const start = cw[sel.start]?.start ?? m.start_time;
             const end = cw[sel.end]?.end ?? m.end_time;
             const text = cw.slice(sel.start, sel.end + 1).map(w => w.word).join(' ');
-            return { start, end, text, audio: m.audio_name };
+            return { start, end, text, audio: m.audio_name, startBuf, endBuf };
         }
 
         async function playSelection(matchIdx) {
-            const { start, end, text, audio } = getSelectionTimes(matchIdx);
+            const { start, end, text, audio, startBuf, endBuf } = getSelectionTimes(matchIdx);
             const actions = document.getElementById('actions-' + matchIdx);
             const btn = actions.querySelector('button');
             btn.disabled = true;
@@ -643,7 +702,7 @@
                 const resp = await fetch('/api/clip', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ audio_name: audio, start_time: start, end_time: end, matched_text: text }),
+                    body: JSON.stringify({ audio_name: audio, start_time: start, end_time: end, matched_text: text, start_buffer: startBuf, end_buffer: endBuf }),
                 });
 
                 if (!resp.ok) throw new Error('Failed to extract clip');
@@ -671,7 +730,7 @@
         }
 
         async function downloadSelection(matchIdx) {
-            const { start, end, text, audio } = getSelectionTimes(matchIdx);
+            const { start, end, text, audio, startBuf, endBuf } = getSelectionTimes(matchIdx);
             const filename = text.slice(0, 20).trim().replace(/[^\w\s-]/g, '').replace(/\s+/g, '_').toLowerCase() + '.mp3';
             const actions = document.getElementById('actions-' + matchIdx);
             const btn = actions.querySelectorAll('button')[1];
@@ -683,7 +742,7 @@
                 const resp = await fetch('/api/clip', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ audio_name: audio, start_time: start, end_time: end, matched_text: text, track: true }),
+                    body: JSON.stringify({ audio_name: audio, start_time: start, end_time: end, matched_text: text, track: true, start_buffer: startBuf, end_buffer: endBuf }),
                 });
                 if (!resp.ok) throw new Error('Failed');
 
