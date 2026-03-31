@@ -374,9 +374,6 @@
             font-size: 1rem;
             color: #ccc;
             margin-bottom: 4px;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
         }
 
         .popular-meta {
@@ -733,14 +730,12 @@
                 let html = `<div class="results-header">${clips.length} clip${clips.length !== 1 ? 's' : ''}</div>`;
                 clips.forEach((c, i) => {
                     const rank = i + 1;
-                    const dl = c.count === 1 ? '1 download' : c.count + ' downloads';
                     html += `
                         <div class="popular-item">
                             <div class="popular-rank">${rank}</div>
                             <div class="popular-info">
-                                <div class="popular-quote" title="${esc(c.quote)}">${esc(c.quote || c.clip_name)}</div>
+                                <div class="popular-quote">${esc(c.quote || c.clip_name)}</div>
                             </div>
-                            <div class="popular-count">${dl}</div>
                             <div class="popular-actions">
                                 <button class="btn-small" onclick="playPopular(this, '${esc(c.clip_name)}')">▶</button>
                                 <a class="btn-small download-link" href="/api/popular/download/${encodeURIComponent(c.clip_name)}" style="text-decoration:none;text-align:center;color:#fff;">⬇</a>
