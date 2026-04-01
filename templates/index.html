@@ -812,19 +812,26 @@
             btn.textContent = '⏳';
             try {
                 const url = '/api/popular/play/' + encodeURIComponent(clipName);
+                const resp = await fetch(url);
+                if (!resp.ok) throw new Error('Failed');
+                const blob = await resp.blob();
+                const blobUrl = URL.createObjectURL(blob);
                 const actions = btn.parentElement;
                 let audio = actions.querySelector('audio');
-                if (audio) { audio.src = url; audio.play(); }
-                else {
+                if (audio) {
+                    audio.src = blobUrl;
+                    audio.play();
+                } else {
                     audio = document.createElement('audio');
                     audio.controls = true;
                     audio.autoplay = true;
-                    audio.src = url;
+                    audio.src = blobUrl;
                     actions.appendChild(audio);
                 }
                 btn.textContent = '▶';
             } catch (err) {
                 btn.textContent = '✗';
+                setTimeout(() => { btn.textContent = '▶'; }, 2000);
             } finally {
                 btn.disabled = false;
             }

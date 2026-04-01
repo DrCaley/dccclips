@@ -179,7 +179,7 @@ def api_clip():
     if quote and data.get("track"):
         _track_clip(clip_path.name, quote, audio_name, start, end)
 
-    return send_file(str(clip_path), mimetype="audio/mpeg")
+    return send_file(str(clip_path), mimetype="audio/mpeg", conditional=True)
 
 
 @app.route("/api/clip_text", methods=["POST"])
@@ -250,7 +250,7 @@ def api_popular_play(clip_name):
     clip_path = CLIPS_DIR / clip_name
     if not clip_path.exists():
         return jsonify({"error": "Clip not found"}), 404
-    return send_file(str(clip_path), mimetype="audio/mpeg")
+    return send_file(str(clip_path), mimetype="audio/mpeg", conditional=True)
 
 
 @app.route("/api/popular/download/<clip_name>")
